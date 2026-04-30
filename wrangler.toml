@@ -7,6 +7,10 @@ binding = "DB"
 database_name = "image-web-db"
 database_id = "4e3a441a-caa2-4d1b-a6f7-44ac0d189fb3"
 
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "image-web-r2"
+
 [vars]
 ADMIN_USER = "admin"
 ADMIN_PASS = "admin123"
