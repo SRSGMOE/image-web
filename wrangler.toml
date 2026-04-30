@@ -1,0 +1,12 @@
+name = "cloud-storage-api"
+main = "src/index.js"
+compatibility_date = "2023-12-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "image-web-db"
+database_id = "4e3a441a-caa2-4d1b-a6f7-44ac0d189fb3"
+
+[vars]
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin123"
