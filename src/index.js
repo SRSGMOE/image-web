@@ -1,15 +1,7 @@
-import { createClient } from 'cloudflare:sqlite';
+// D1 database is accessed via env.DB
 
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 10000
-})
-const router = createRouter({
-  history: createWebHashHistory(),
-  routes
-})
 
 export default {
   async fetch(request, env, ctx) {
@@ -48,21 +40,21 @@ export default {
 };
 
 async function initDB(env) {
-  const db = createClient(env.DB);
-  await db.exec(`
+  // D1 database accessed directly via env.DB
+  await env.DB.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL
     );
   `);
-  await db.exec(`
+  await env.DB.exec(`
     CREATE TABLE IF NOT EXISTS config (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
   `);
-  await db.exec(`
+  await env.DB.exec(`
     CREATE TABLE IF NOT EXISTS images (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -71,9 +63,9 @@ async function initDB(env) {
       upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
-  const stmt = db.prepare("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)");
+  const stmt = env.DB.prepare("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)");
   await stmt.bind(ADMIN_USER, ADMIN_PASS).run();
-  const configStmt = db.prepare("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)");
+  const configStmt = env.DB.prepare("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)");
   await configStmt.bind("r2_bucket", "default-bucket").run();
   await configStmt.bind("r2_access_key_id", "").run();
   await configStmt.bind("r2_access_key", "").run();
@@ -84,8 +76,8 @@ async function initDB(env) {
 async function handleLogin(request, env) {
   await initDB(env);
   const { username, password } = await request.json();
-  const db = createClient(env.DB);
-  const stmt = db.prepare("SELECT * FROM users WHERE username = ? AND password = ?");
+  // D1 database accessed directly via env.DB
+  const stmt = env.DB.prepare("SELECT * FROM users WHERE username = ? AND password = ?");
   const result = await stmt.bind(username, password).first();
   if (result) {
     return new Response(JSON.stringify({ success: true, token: 'fake-jwt-token-' + Date.now() }), {
@@ -107,8 +99,8 @@ async function handleUpload(request, env, ctx) {
   const key = `uploads/${Date.now()}-${file.name}`;
   await env.R2.put(key, blob);
   const url = `https://${bucketName}.r2.cloudflarestorage.com/${key}`;
-  const db = createClient(env.DB);
-  const stmt = db.prepare("INSERT INTO images (name, url, size) VALUES (?, ?, ?)");
+  // D1 database accessed directly via env.DB
+  const stmt = env.DB.prepare("INSERT INTO images (name, url, size) VALUES (?, ?, ?)");
   await stmt.bind(file.name, url, file.size).run();
   return new Response(JSON.stringify({ success: true, url }), {
     headers: { 'Content-Type': 'application/json' }
@@ -116,16 +108,16 @@ async function handleUpload(request, env, ctx) {
 }
 
 async function handleImages(request, env, url) {
-  const db = createClient(env.DB);
+  // D1 database accessed directly via env.DB
   if (url.pathname === '/api/images') {
-    const stmt = db.prepare("SELECT * FROM images ORDER BY upload_date DESC");
+    const stmt = env.DB.prepare("SELECT * FROM images ORDER BY upload_date DESC");
     const images = await stmt.all();
     return new Response(JSON.stringify(images), {
       headers: { 'Content-Type': 'application/json' }
     });
   } else {
     const id = url.pathname.split('/').pop();
-    const stmt = db.prepare("DELETE FROM images WHERE id = ?");
+    const stmt = env.DB.prepare("DELETE FROM images WHERE id = ?");
     await stmt.bind(id).run();
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
@@ -134,9 +126,9 @@ async function handleImages(request, env, url) {
 }
 
 async function handleSettings(request, env) {
-  const db = createClient(env.DB);
+  // D1 database accessed directly via env.DB
   if (request.method === 'GET') {
-    const configStmt = db.prepare("SELECT * FROM config");
+    const configStmt = env.DB.prepare("SELECT * FROM config");
     const configs = await configStmt.all();
     const settings = {};
     configs.forEach(row => settings[row.key] = row.value);
@@ -146,7 +138,7 @@ async function handleSettings(request, env) {
   } else {
     const data = await request.json();
     for (const [key, value] of Object.entries(data)) {
-      const stmt = db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)");
+      const stmt = env.DB.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)");
       await stmt.bind(key, value).run();
     }
     return new Response(JSON.stringify({ success: true }), {
@@ -156,12 +148,12 @@ async function handleSettings(request, env) {
 }
 
 async function handleStats(request, env) {
-  const db = createClient(env.DB);
-  const totalStmt = db.prepare("SELECT COUNT(*) as count FROM images");
+  // D1 database accessed directly via env.DB
+  const totalStmt = env.DB.prepare("SELECT COUNT(*) as count FROM images");
   const total = await totalStmt.first();
-  const sizeStmt = db.prepare("SELECT SUM(size) as total FROM images");
+  const sizeStmt = env.DB.prepare("SELECT SUM(size) as total FROM images");
   const size = await sizeStmt.first();
-  const todayStmt = db.prepare("SELECT COUNT(*) as count FROM images WHERE DATE(upload_date) = DATE('now')");
+  const todayStmt = env.DB.prepare("SELECT COUNT(*) as count FROM images WHERE DATE(upload_date) = DATE('now')");
   const today = await todayStmt.first();
   return new Response(JSON.stringify({
     total: total.count,
